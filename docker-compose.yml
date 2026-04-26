@@ -10,6 +10,12 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:                      
+      test: ["CMD-SHELL", "pg_isready -U ncba -d ncba"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   influxdb:
     image: influxdb:2.7
@@ -61,6 +67,8 @@ services:
   redis:
     image: redis:7
     restart: unless-stopped
+    ports:
+      - "6379:6379"
 
   snort:
     image: ciscotalos/snort3
@@ -85,6 +93,47 @@ services:
     tty: true
     stdin_open: true
 
+
+  spire-server:
+    image: ghcr.io/spiffe/spire-server:1.9.0
+    restart: unless-stopped
+    hostname: spire-server
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./spire-server.conf:/opt/spire/conf/server/server.conf:ro
+      - spire_server_data:/opt/spire/data
+    command: ["-config", "/opt/spire/conf/server/server.conf"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/opt/spire/bin/spire-server", "healthcheck"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  spire-agent:
+    image: ghcr.io/spiffe/spire-agent:1.9.0
+    restart: unless-stopped
+    privileged: true  
+    pid: host         
+    environment:
+      - SPIRE_AGENT_JOIN_TOKEN=4f8f6899-7880-4102-8363-6f58a00c85d5
+    volumes:
+      - ./spire-agent.conf:/opt/spire/conf/agent/agent.conf:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro  
+      - spire_agent_data:/opt/spire/data
+    command: [
+      "-config", "/opt/spire/conf/agent/agent.conf",
+      "-joinToken", "4f8f6899-7880-4102-8363-6f58a00c85d5"
+    ]
+    depends_on:
+      spire-server:
+        condition: service_healthy
+
 volumes:
   postgres_data:
   influxdb_data:
+  spire_server_data:
+  spire_agent_data:
