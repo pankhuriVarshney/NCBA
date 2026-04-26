@@ -62,6 +62,29 @@ services:
     image: redis:7
     restart: unless-stopped
 
+  snort:
+    image: ciscotalos/snort3
+    container_name: snort
+    network_mode: host
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    user: root
+    volumes:
+      - ./logs:/var/log/snort
+    entrypoint: [""]
+    command: [
+      "/home/snorty/snort3/bin/snort",
+      "-v",
+      "-i", "wlan0",
+      "-c", "/home/snorty/snort3/etc/snort/snort.lua",
+      "-A", "alert_fast",
+      "-l", "/var/log/snort"
+    ]
+    tty: true
+    stdin_open: true
+
 volumes:
   postgres_data:
   influxdb_data:
